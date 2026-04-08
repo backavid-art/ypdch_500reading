@@ -322,6 +322,7 @@
       <div class="admin-grid">
         <input id="nameInput" type="text" placeholder="이름 입력 (예: 홍길동)" />
         <select id="districtInput">
+          <option value="목회자">목회자</option>
           <option value="당회원">당회원</option>
           <option value="장년교구">장년교구</option>
           <option value="중년교구">중년교구</option>
@@ -338,6 +339,7 @@
         <div class="edit-grid">
           <input id="editNameInput" type="text" placeholder="수정할 이름" />
           <select id="editDistrictInput">
+            <option value="목회자">목회자</option>
             <option value="당회원">당회원</option>
             <option value="장년교구">장년교구</option>
             <option value="중년교구">중년교구</option>
@@ -358,7 +360,7 @@
   </div>
 
   <script>
-    const DISTRICTS = ["당회원", "장년교구", "중년교구", "젊은이교구", "청년교구", "다음세대"];
+    const DISTRICTS = ["목회자", "당회원", "장년교구", "중년교구", "젊은이교구", "청년교구", "다음세대"];
 
     const passwordInput = document.getElementById("passwordInput");
     const loginBtn = document.getElementById("loginBtn");
@@ -503,7 +505,7 @@
       if (!member) return;
       editingMemberId = member.id;
       editNameInput.value = member.name || "";
-      editDistrictInput.value = member.district || "당회원";
+      editDistrictInput.value = member.district || "목회자";
       editBox.style.display = "block";
       editNameInput.focus();
     }
@@ -511,7 +513,7 @@
     function closeEditBox() {
       editingMemberId = null;
       editNameInput.value = "";
-      editDistrictInput.value = "당회원";
+      editDistrictInput.value = "목회자";
       editBox.style.display = "none";
     }
 

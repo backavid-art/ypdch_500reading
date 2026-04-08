@@ -9,7 +9,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '2026bible500';
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const GOAL_READS = 500;
 const APP_TZ = process.env.APP_TZ || 'Asia/Seoul';
-const DISTRICTS = ['당회원', '장년교구', '중년교구', '젊은이교구', '청년교구', '다음세대'];
+const DISTRICTS = ['목회자', '당회원', '장년교구', '중년교구', '젊은이교구', '청년교구', '다음세대'];
 
 if (!DATABASE_URL) {
   console.error('Missing DATABASE_URL. Please set Supabase/Postgres connection string.');
