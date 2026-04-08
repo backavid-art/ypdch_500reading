@@ -186,9 +186,34 @@
     }
     .admin-grid {
       display: grid;
-      grid-template-columns: 1.15fr 1fr 0.7fr 0.7fr;
+      grid-template-columns: 1.1fr 1fr 0.7fr 0.7fr 0.8fr;
       gap: 10px;
     }
+    .edit-box {
+      margin-top: 10px;
+      border: 1px dashed #d6c7a8;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff9ec;
+    }
+    .edit-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 0.7fr 0.7fr;
+      gap: 10px;
+    }
+    .row-actions { display: flex; gap: 6px; }
+    .action-btn {
+      height: 32px;
+      min-width: 52px;
+      border-radius: 8px;
+      border: none;
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .edit-btn { background: linear-gradient(180deg, #5f8fbc 0%, #49749d 100%); }
+    .del-btn { background: linear-gradient(180deg, #c06060 0%, #9e4343 100%); }
 
     input, button, select {
       width: 100%;
@@ -218,7 +243,7 @@
     .lock { color: #8a5a17; }
 
     @media (max-width: 760px) {
-      .auth-grid, .admin-grid { grid-template-columns: 1fr; }
+      .auth-grid, .admin-grid, .edit-grid { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: 1fr; gap: 6px; }
       .bar-value { text-align: left; }
     }
@@ -269,11 +294,12 @@
               <th>교구</th>
               <th>완독 횟수</th>
               <th>최근 기록</th>
+              <th>관리</th>
             </tr>
           </thead>
           <tbody id="hallBody">
             <tr>
-              <td colspan="5" style="text-align:center;color:#7a6c5a;padding:18px;">아직 기록이 없습니다. 첫 이름을 등록해 주세요.</td>
+              <td colspan="6" style="text-align:center;color:#7a6c5a;padding:18px;">아직 기록이 없습니다. 첫 이름을 등록해 주세요.</td>
             </tr>
           </tbody>
         </table>
@@ -305,6 +331,23 @@
         </select>
         <button id="addBtn">1독 추가</button>
         <button id="resetBtn" style="background:linear-gradient(180deg,#7d6a4f 0%, #65533a 100%);">전체 초기화</button>
+        <button id="backupBtn" style="background:linear-gradient(180deg,#4c7d54 0%, #34603f 100%);">백업 실행</button>
+      </div>
+      <div id="editBox" class="edit-box" style="display:none;">
+        <div style="font-size:0.9rem; color:#6b5a3b; font-weight:700; margin-bottom:8px;">인물 수정</div>
+        <div class="edit-grid">
+          <input id="editNameInput" type="text" placeholder="수정할 이름" />
+          <select id="editDistrictInput">
+            <option value="당회원">당회원</option>
+            <option value="장년교구">장년교구</option>
+            <option value="중년교구">중년교구</option>
+            <option value="젊은이교구">젊은이교구</option>
+            <option value="청년교구">청년교구</option>
+            <option value="다음세대">다음세대</option>
+          </select>
+          <button id="editSaveBtn" style="background:linear-gradient(180deg,#5f8fbc 0%, #49749d 100%);">수정 저장</button>
+          <button id="editCancelBtn" style="background:linear-gradient(180deg,#7b7b7b 0%, #5f5f5f 100%);">취소</button>
+        </div>
       </div>
       <div class="meta">
         <span class="tag">총 참여자: <strong id="totalPeople">0</strong>명</span>
@@ -324,6 +367,7 @@
     const districtInput = document.getElementById("districtInput");
     const addBtn = document.getElementById("addBtn");
     const resetBtn = document.getElementById("resetBtn");
+    const backupBtn = document.getElementById("backupBtn");
     const hallBody = document.getElementById("hallBody");
     const monthlyBoard = document.getElementById("monthlyBoard");
     const districtChart = document.getElementById("districtChart");
@@ -334,9 +378,15 @@
     const thermoFill = document.getElementById("thermoFill");
     const thermoText = document.getElementById("thermoText");
     const thermoSummary = document.getElementById("thermoSummary");
+    const editBox = document.getElementById("editBox");
+    const editNameInput = document.getElementById("editNameInput");
+    const editDistrictInput = document.getElementById("editDistrictInput");
+    const editSaveBtn = document.getElementById("editSaveBtn");
+    const editCancelBtn = document.getElementById("editCancelBtn");
 
     let adminToken = sessionStorage.getItem("admin_token") || "";
     let currentState = null;
+    let editingMemberId = null;
 
     function escapeHtml(str) {
       return String(str)
@@ -363,10 +413,12 @@
       districtInput.disabled = !isAdmin;
       addBtn.disabled = !isAdmin;
       resetBtn.disabled = !isAdmin;
+      backupBtn.disabled = !isAdmin;
       passwordInput.disabled = isAdmin;
       loginBtn.disabled = isAdmin;
       logoutBtn.disabled = !isAdmin;
       if (!isAdmin) nameInput.value = "";
+      if (!isAdmin) closeEditBox();
     }
 
     async function api(path, method = "GET", body = null) {
@@ -422,9 +474,10 @@
 
     function renderHall(members) {
       if (!Array.isArray(members) || !members.length) {
-        hallBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#7a6c5a;padding:18px;">아직 기록이 없습니다. 첫 이름을 등록해 주세요.</td></tr>';
+        hallBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#7a6c5a;padding:18px;">아직 기록이 없습니다. 첫 이름을 등록해 주세요.</td></tr>';
         return;
       }
+      const isAdmin = Boolean(adminToken);
       hallBody.innerHTML = members.map((m, i) => `
         <tr>
           <td>#${i + 1}</td>
@@ -432,8 +485,34 @@
           <td><span class="district-chip">${escapeHtml(m.district)}</span></td>
           <td><span class="count">${m.count}</span>독</td>
           <td>${escapeHtml(m.lastAtText || "-")}</td>
+          <td>
+            ${
+              isAdmin
+                ? `<div class="row-actions">
+                    <button class="action-btn edit-btn" data-action="edit" data-id="${m.id}">수정</button>
+                    <button class="action-btn del-btn" data-action="delete" data-id="${m.id}">삭제</button>
+                  </div>`
+                : "-"
+            }
+          </td>
         </tr>
       `).join("");
+    }
+
+    function openEditBox(member) {
+      if (!member) return;
+      editingMemberId = member.id;
+      editNameInput.value = member.name || "";
+      editDistrictInput.value = member.district || "당회원";
+      editBox.style.display = "block";
+      editNameInput.focus();
+    }
+
+    function closeEditBox() {
+      editingMemberId = null;
+      editNameInput.value = "";
+      editDistrictInput.value = "당회원";
+      editBox.style.display = "none";
     }
 
     function render(state) {
@@ -543,16 +622,103 @@
       }
     }
 
+    async function runBackup() {
+      if (!adminToken) {
+        flash("관리자 로그인 후 백업할 수 있습니다.", "lock");
+        return;
+      }
+      try {
+        const data = await api("/api/backups/manual", "POST", { token: adminToken });
+        flash(data.message || "백업이 생성되었습니다.", "ok");
+      } catch (e) {
+        flash(e.message, "error");
+      }
+    }
+
+    async function deleteMember(id) {
+      if (!adminToken) {
+        flash("관리자 로그인 후 삭제할 수 있습니다.", "lock");
+        return;
+      }
+      if (!confirm("이 인물의 기록을 삭제할까요?")) return;
+      try {
+        const data = await api("/api/members/delete", "POST", { token: adminToken, id });
+        render(data.state);
+        closeEditBox();
+        flash(data.message || "삭제되었습니다.", "ok");
+      } catch (e) {
+        flash(e.message, "error");
+      }
+    }
+
+    async function saveMemberEdit() {
+      if (!adminToken) {
+        flash("관리자 로그인 후 수정할 수 있습니다.", "lock");
+        return;
+      }
+      if (!editingMemberId) {
+        flash("수정할 인물을 먼저 선택해 주세요.", "error");
+        return;
+      }
+      const name = (editNameInput.value || "").trim();
+      const district = editDistrictInput.value;
+      if (!name) {
+        flash("이름을 입력해 주세요.", "error");
+        editNameInput.focus();
+        return;
+      }
+      if (!DISTRICTS.includes(district)) {
+        flash("교구를 선택해 주세요.", "error");
+        editDistrictInput.focus();
+        return;
+      }
+      try {
+        const data = await api("/api/members/update", "POST", {
+          token: adminToken,
+          id: editingMemberId,
+          name,
+          district
+        });
+        render(data.state);
+        closeEditBox();
+        flash(data.message || "수정되었습니다.", "ok");
+      } catch (e) {
+        flash(e.message, "error");
+      }
+    }
+
     loginBtn.addEventListener("click", login);
     logoutBtn.addEventListener("click", logout);
     addBtn.addEventListener("click", addOneRead);
     resetBtn.addEventListener("click", resetAll);
+    backupBtn.addEventListener("click", runBackup);
+    editSaveBtn.addEventListener("click", saveMemberEdit);
+    editCancelBtn.addEventListener("click", closeEditBox);
+
+    hallBody.addEventListener("click", (e) => {
+      const target = e.target.closest("button[data-action]");
+      if (!target) return;
+      const id = Number(target.dataset.id);
+      if (!Number.isInteger(id)) return;
+      const action = target.dataset.action;
+      if (action === "delete") {
+        deleteMember(id);
+        return;
+      }
+      if (action === "edit") {
+        const member = (currentState?.members || []).find((m) => Number(m.id) === id);
+        openEditBox(member);
+      }
+    });
 
     passwordInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") login();
     });
     nameInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") addOneRead();
+    });
+    editNameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveMemberEdit();
     });
 
     updateAdminLock();

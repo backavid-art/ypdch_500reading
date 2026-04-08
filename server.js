@@ -26,6 +26,7 @@ const pool = new Pool({
 
 const sessions = new Map();
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+let backupJobRunning = false;
 
 function normalizeName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ');
@@ -86,6 +87,75 @@ async function initDb() {
       at timestamptz not null default now()
     );
   `);
+
+  await pool.query(`
+    create table if not exists backup_snapshots (
+      id bigserial primary key,
+      created_at timestamptz not null default now(),
+      reason text not null,
+      payload jsonb not null
+    );
+  `);
+}
+
+function todayKeyInTz() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
+async function createBackupSnapshot(reason = 'manual') {
+  const membersRes = await pool.query(`
+    select id, name, district, count, last_at
+    from members
+    order by id asc;
+  `);
+  const logsRes = await pool.query(`
+    select id, name, district, at
+    from read_logs
+    order by id asc;
+  `);
+  const payload = {
+    createdAt: nowIso(),
+    appTz: APP_TZ,
+    members: membersRes.rows,
+    logs: logsRes.rows,
+  };
+  await pool.query(
+    `insert into backup_snapshots(reason, payload) values($1, $2::jsonb);`,
+    [reason, JSON.stringify(payload)]
+  );
+}
+
+async function ensureDailyAutoBackup() {
+  if (backupJobRunning) return;
+  backupJobRunning = true;
+  try {
+    const today = todayKeyInTz();
+    const check = await pool.query(
+      `
+        select id
+        from backup_snapshots
+        where reason = 'auto'
+          and to_char(created_at at time zone $1, 'YYYY-MM-DD') = $2
+        limit 1;
+      `,
+      [APP_TZ, today]
+    );
+    if (check.rowCount === 0) {
+      await createBackupSnapshot('auto');
+    }
+  } finally {
+    backupJobRunning = false;
+  }
 }
 
 async function buildState() {
@@ -97,6 +167,7 @@ async function buildState() {
   `);
 
   const members = membersRes.rows.map((r) => ({
+    id: Number(r.id),
     name: normalizeName(r.name),
     district: normalizeDistrict(r.district),
     count: Number(r.count || 0),
@@ -361,6 +432,144 @@ async function handleApi(req, res) {
     }
   }
 
+  if (req.method === 'POST' && req.url === '/api/backups/manual') {
+    try {
+      const body = await parseBody(req);
+      if (!validateSession(body.token)) {
+        return sendJson(res, 401, { ok: false, message: '관리자 인증이 필요합니다.' });
+      }
+      await createBackupSnapshot('manual');
+      return sendJson(res, 200, { ok: true, message: '백업이 생성되었습니다.' });
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, message: e.message || '백업 실패' });
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/api/members/delete') {
+    try {
+      const body = await parseBody(req);
+      if (!validateSession(body.token)) {
+        return sendJson(res, 401, { ok: false, message: '관리자 인증이 필요합니다.' });
+      }
+      const id = Number(body.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJson(res, 400, { ok: false, message: '올바른 대상이 아닙니다.' });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        const targetRes = await client.query(
+          `select id, name, district from members where id = $1 for update;`,
+          [id]
+        );
+        if (targetRes.rowCount === 0) {
+          await client.query('rollback');
+          return sendJson(res, 404, { ok: false, message: '대상을 찾을 수 없습니다.' });
+        }
+        const target = targetRes.rows[0];
+        await client.query(`delete from members where id = $1;`, [id]);
+        await client.query(
+          `delete from read_logs where name = $1 and district = $2;`,
+          [target.name, target.district]
+        );
+        await client.query('commit');
+      } catch (err) {
+        await client.query('rollback');
+        throw err;
+      } finally {
+        client.release();
+      }
+
+      return sendJson(res, 200, {
+        ok: true,
+        message: '선택한 인물 기록이 삭제되었습니다.',
+        state: await buildState(),
+      });
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, message: e.message || '삭제 실패' });
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/api/members/update') {
+    try {
+      const body = await parseBody(req);
+      if (!validateSession(body.token)) {
+        return sendJson(res, 401, { ok: false, message: '관리자 인증이 필요합니다.' });
+      }
+
+      const id = Number(body.id);
+      const newName = normalizeName(body.name);
+      const newDistrict = normalizeDistrict(body.district);
+      if (!Number.isInteger(id) || id <= 0) {
+        return sendJson(res, 400, { ok: false, message: '올바른 대상이 아닙니다.' });
+      }
+      if (!newName) return sendJson(res, 400, { ok: false, message: '이름을 입력해 주세요.' });
+      if (!DISTRICTS.includes(newDistrict)) {
+        return sendJson(res, 400, { ok: false, message: '교구를 올바르게 선택해 주세요.' });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+
+        const currentRes = await client.query(
+          `select id, name, district, count, last_at from members where id = $1 for update;`,
+          [id]
+        );
+        if (currentRes.rowCount === 0) {
+          await client.query('rollback');
+          return sendJson(res, 404, { ok: false, message: '대상을 찾을 수 없습니다.' });
+        }
+        const current = currentRes.rows[0];
+
+        const sameRes = await client.query(
+          `select id, count, last_at from members where name = $1 and district = $2 and id <> $3 for update;`,
+          [newName, newDistrict, id]
+        );
+
+        if (sameRes.rowCount > 0) {
+          const other = sameRes.rows[0];
+          await client.query(
+            `
+              update members
+              set count = $1,
+                  last_at = greatest(coalesce(last_at, to_timestamp(0)), coalesce($2::timestamptz, to_timestamp(0)))
+              where id = $3;
+            `,
+            [Number(other.count || 0) + Number(current.count || 0), current.last_at, other.id]
+          );
+          await client.query(`delete from members where id = $1;`, [id]);
+        } else {
+          await client.query(
+            `update members set name = $1, district = $2 where id = $3;`,
+            [newName, newDistrict, id]
+          );
+        }
+
+        await client.query(
+          `update read_logs set name = $1, district = $2 where name = $3 and district = $4;`,
+          [newName, newDistrict, current.name, current.district]
+        );
+
+        await client.query('commit');
+      } catch (err) {
+        await client.query('rollback');
+        throw err;
+      } finally {
+        client.release();
+      }
+
+      return sendJson(res, 200, {
+        ok: true,
+        message: '인물 정보가 수정되었습니다.',
+        state: await buildState(),
+      });
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, message: e.message || '수정 실패' });
+    }
+  }
+
   return notFound(res);
 }
 
@@ -373,6 +582,12 @@ const server = http.createServer(async (req, res) => {
 (async () => {
   try {
     await initDb();
+    await ensureDailyAutoBackup();
+    setInterval(() => {
+      ensureDailyAutoBackup().catch((err) => {
+        console.error('Auto backup failed:', err.message);
+      });
+    }, 10 * 60 * 1000);
     server.listen(PORT, () => {
       console.log(`Bible Hall server running at http://localhost:${PORT}`);
     });

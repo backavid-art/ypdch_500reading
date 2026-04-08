@@ -51,3 +51,10 @@ git push -u origin main
 - `POST /api/logout` : 관리자 로그아웃
 - `POST /api/reads` : 1독 추가
 - `POST /api/reset` : 전체 초기화
+- `POST /api/backups/manual` : 수동 백업 생성(관리자)
+- `POST /api/members/update` : 이름/교구 수정(관리자)
+- `POST /api/members/delete` : 인물 삭제(관리자)
+
+## 7) 백업
+- 자동백업: 서버가 하루 1회(Asia/Seoul 기준) DB 스냅샷을 `backup_snapshots` 테이블에 저장
+- 수동백업: 관리자 화면의 `백업 실행` 버튼
