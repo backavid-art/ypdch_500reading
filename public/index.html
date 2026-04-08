@@ -72,13 +72,13 @@
       position: absolute;
       left: 0; top: 0; bottom: 0;
       width: 0%;
-      background: linear-gradient(90deg, #d09224 0%, #f2c15e 70%, #ffd98f 100%);
+      background: linear-gradient(90deg, #b71c1c 0%, #d32f2f 60%, #ef5350 100%);
       transition: width .35s ease;
     }
     .thermo-bulb {
       width: 34px; height: 34px; border-radius: 50%; position: absolute; right: -10px; top: -4px;
-      background: radial-gradient(circle at 35% 30%, #ffe0a4 0%, #d89e38 68%, #be851e 100%);
-      border: 1px solid #bf8a31;
+      background: radial-gradient(circle at 35% 30%, #ffc9c9 0%, #d32f2f 68%, #b71c1c 100%);
+      border: 1px solid #a31414;
     }
     .ticks { display: grid; grid-template-columns: repeat(6, 1fr); font-size: 0.83rem; color: #7a6a55; }
     .ticks span { text-align: center; }
@@ -150,6 +150,13 @@
       font-size: 0.9rem;
       font-weight: 700;
     }
+    .district-pastor { background: #ffe7e7; border-color: #f0b3b3; color: #8f1f1f; }
+    .district-elder { background: #fff3da; border-color: #e8c98b; color: #8a5e13; }
+    .district-adult { background: #e8f7ff; border-color: #b9dced; color: #2f5f7a; }
+    .district-middle { background: #edf7e8; border-color: #c5dfb8; color: #3d6a2d; }
+    .district-youngadult { background: #efe9ff; border-color: #c8bbea; color: #5d4592; }
+    .district-youth { background: #ffeef9; border-color: #e8c2da; color: #8a3f73; }
+    .district-next { background: #f0f0f0; border-color: #d0d0d0; color: #585858; }
 
     .count { font-weight: 800; color: var(--gold-dark); }
 
@@ -252,7 +259,7 @@
 <body>
   <div class="container">
     <section class="hero">
-      <h1>양평동교회 성경 500독 명예의 전당</h1>
+      <h1 id="heroTitle">양평동교회 성경 500독 명예의 전당</h1>
       <div class="subtitle">2026년 전교인 성경500독 대장정 (2026년 1월 ~ 2026년 12월까지)</div>
     </section>
 
@@ -380,6 +387,7 @@
     const thermoFill = document.getElementById("thermoFill");
     const thermoText = document.getElementById("thermoText");
     const thermoSummary = document.getElementById("thermoSummary");
+    const heroTitle = document.getElementById("heroTitle");
     const editBox = document.getElementById("editBox");
     const editNameInput = document.getElementById("editNameInput");
     const editDistrictInput = document.getElementById("editDistrictInput");
@@ -484,7 +492,7 @@
         <tr>
           <td>#${i + 1}</td>
           <td><strong>${escapeHtml(m.name)}</strong></td>
-          <td><span class="district-chip">${escapeHtml(m.district)}</span></td>
+          <td><span class="district-chip ${districtClass(m.district)}">${escapeHtml(m.district)}</span></td>
           <td><span class="count">${m.count}</span>독</td>
           <td>${escapeHtml(m.lastAtText || "-")}</td>
           <td>
@@ -499,6 +507,25 @@
           </td>
         </tr>
       `).join("");
+    }
+
+    function districtClass(d) {
+      if (d === "목회자") return "district-pastor";
+      if (d === "당회원") return "district-elder";
+      if (d === "장년교구") return "district-adult";
+      if (d === "중년교구") return "district-middle";
+      if (d === "젊은이교구") return "district-youngadult";
+      if (d === "청년교구") return "district-youth";
+      if (d === "다음세대") return "district-next";
+      return "";
+    }
+
+    function renderHeroDate() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      heroTitle.textContent = `양평동교회 성경 500독 명예의 전당 (${y}-${m}-${d})`;
     }
 
     function openEditBox(member) {
@@ -724,6 +751,7 @@
     });
 
     updateAdminLock();
+    renderHeroDate();
     fetchState();
     setInterval(() => fetchState(true), 30000);
   </script>
