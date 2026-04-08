@@ -160,7 +160,7 @@ async function ensureDailyAutoBackup() {
 
 async function buildState() {
   const membersRes = await pool.query(`
-    select name, district, count, last_at
+    select id, name, district, count, last_at
     from members
     where count >= 0
     order by count desc, name asc;
