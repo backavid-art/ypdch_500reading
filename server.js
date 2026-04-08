@@ -2,45 +2,30 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Pool } = require('pg');
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '2026bible500';
+const DATABASE_URL = process.env.DATABASE_URL || '';
 const GOAL_READS = 500;
+const APP_TZ = process.env.APP_TZ || 'Asia/Seoul';
 const DISTRICTS = ['당회원', '장년교구', '중년교구', '젊은이교구', '청년교구', '다음세대'];
+
+if (!DATABASE_URL) {
+  console.error('Missing DATABASE_URL. Please set Supabase/Postgres connection string.');
+  process.exit(1);
+}
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(ROOT, 'data');
-const STORE_PATH = path.join(DATA_DIR, 'store.json');
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: DATABASE_URL.includes('supabase.co') ? { rejectUnauthorized: false } : undefined,
+});
 
 const sessions = new Map();
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-
-function ensureStore() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(STORE_PATH)) {
-    fs.writeFileSync(STORE_PATH, JSON.stringify({ members: [], logs: [] }, null, 2), 'utf8');
-  }
-}
-
-function readStore() {
-  ensureStore();
-  try {
-    const raw = fs.readFileSync(STORE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    const members = Array.isArray(parsed.members) ? parsed.members : [];
-    const logs = Array.isArray(parsed.logs) ? parsed.logs : [];
-    return { members, logs };
-  } catch {
-    return { members: [], logs: [] };
-  }
-}
-
-function writeStore(store) {
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
-}
 
 function normalizeName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ');
@@ -65,50 +50,80 @@ function formatKST(iso) {
   return `${y}-${m}-${day} ${hh}:${mm}`;
 }
 
-function buildState() {
-  const store = readStore();
-  const members = store.members
-    .map((m) => ({
-      name: normalizeName(m.name),
-      district: normalizeDistrict(m.district),
-      count: Number.isFinite(Number(m.count)) ? Number(m.count) : 0,
-      lastAt: typeof m.lastAt === 'string' ? m.lastAt : '',
-    }))
-    .filter((m) => m.name && m.count >= 0)
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name, 'ko');
-    });
+function getCurrentMonthLabel() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: APP_TZ,
+    year: 'numeric',
+    month: 'numeric',
+  }).formatToParts(now);
+  const year = parts.find((p) => p.type === 'year')?.value || String(now.getFullYear());
+  const month = parts.find((p) => p.type === 'month')?.value || String(now.getMonth() + 1);
+  return `${year}년 ${month}월`;
+}
+
+async function initDb() {
+  await pool.query(`
+    create table if not exists members (
+      id bigserial primary key,
+      name text not null,
+      district text not null,
+      count integer not null default 0,
+      last_at timestamptz
+    );
+  `);
+
+  await pool.query(`
+    create unique index if not exists members_name_district_uq
+    on members(name, district);
+  `);
+
+  await pool.query(`
+    create table if not exists read_logs (
+      id bigserial primary key,
+      name text not null,
+      district text not null,
+      at timestamptz not null default now()
+    );
+  `);
+}
+
+async function buildState() {
+  const membersRes = await pool.query(`
+    select name, district, count, last_at
+    from members
+    where count >= 0
+    order by count desc, name asc;
+  `);
+
+  const members = membersRes.rows.map((r) => ({
+    name: normalizeName(r.name),
+    district: normalizeDistrict(r.district),
+    count: Number(r.count || 0),
+    lastAt: r.last_at,
+    lastAtText: formatKST(r.last_at),
+  }));
 
   const totalReads = members.reduce((sum, m) => sum + m.count, 0);
   const totalPeople = members.length;
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  const monthlyRes = await pool.query(
+    `
+      select name, district, count(*)::int as count, max(at) as last_at
+      from read_logs
+      where date_trunc('month', at at time zone $1) = date_trunc('month', now() at time zone $1)
+      group by name, district
+      order by count desc, last_at desc;
+    `,
+    [APP_TZ]
+  );
 
-  const monthLogs = (Array.isArray(store.logs) ? store.logs : []).filter((x) => {
-    const d = new Date(x.at);
-    return Number.isFinite(d.getTime()) && d.getFullYear() === year && d.getMonth() === month;
-  });
-
-  const monthlyMap = {};
-  for (const l of monthLogs) {
-    const name = normalizeName(l.name);
-    const district = normalizeDistrict(l.district);
-    if (!name) continue;
-    const key = `${name}__${district}`;
-    if (!monthlyMap[key]) monthlyMap[key] = { name, district, count: 0, lastAt: '' };
-    monthlyMap[key].count += 1;
-    if (!monthlyMap[key].lastAt || new Date(l.at).getTime() > new Date(monthlyMap[key].lastAt).getTime()) {
-      monthlyMap[key].lastAt = l.at;
-    }
-  }
-
-  const monthlyUpdates = Object.values(monthlyMap).sort((a, b) => {
-    if (b.count !== a.count) return b.count - a.count;
-    return new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime();
-  });
+  const monthlyUpdates = monthlyRes.rows.map((r) => ({
+    name: normalizeName(r.name),
+    district: normalizeDistrict(r.district),
+    count: Number(r.count || 0),
+    lastAt: r.last_at,
+  }));
 
   const districtTotals = {};
   for (const d of DISTRICTS) districtTotals[d] = 0;
@@ -123,11 +138,11 @@ function buildState() {
     goalReads: GOAL_READS,
     totalReads,
     totalPeople,
-    members: members.map((m) => ({ ...m, lastAtText: formatKST(m.lastAt) })),
+    members,
     monthlyUpdates,
     districtTotals,
     serverTime: nowIso(),
-    currentMonthLabel: `${year}년 ${month + 1}월`,
+    currentMonthLabel: getCurrentMonthLabel(),
   };
 }
 
@@ -205,9 +220,7 @@ function serveStatic(req, res) {
   const normalized = path.normalize(filePath).replace(/^\.\.(\/|\\|$)/, '');
   const abs = path.join(PUBLIC_DIR, normalized);
 
-  if (!abs.startsWith(PUBLIC_DIR)) {
-    return notFound(res);
-  }
+  if (!abs.startsWith(PUBLIC_DIR)) return notFound(res);
 
   fs.readFile(abs, (err, data) => {
     if (err) return notFound(res);
@@ -236,7 +249,12 @@ async function handleApi(req, res) {
   }
 
   if (req.method === 'GET' && req.url.startsWith('/api/state')) {
-    return sendJson(res, 200, { ok: true, state: buildState() });
+    try {
+      const state = await buildState();
+      return sendJson(res, 200, { ok: true, state });
+    } catch (e) {
+      return sendJson(res, 500, { ok: false, message: '상태 조회 실패', detail: e.message });
+    }
   }
 
   if (req.method === 'POST' && req.url === '/api/login') {
@@ -277,25 +295,37 @@ async function handleApi(req, res) {
         return sendJson(res, 400, { ok: false, message: '교구를 올바르게 선택해 주세요.' });
       }
 
-      const store = readStore();
-      let target = store.members.find((m) => normalizeName(m.name) === name && normalizeDistrict(m.district) === district);
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
 
-      if (!target) {
-        target = { name, district, count: 0, lastAt: '' };
-        store.members.push(target);
+        await client.query(
+          `
+            insert into members(name, district, count, last_at)
+            values($1, $2, 1, now())
+            on conflict(name, district)
+            do update set count = members.count + 1, last_at = now();
+          `,
+          [name, district]
+        );
+
+        await client.query(
+          `insert into read_logs(name, district, at) values($1, $2, now());`,
+          [name, district]
+        );
+
+        await client.query('commit');
+      } catch (err) {
+        await client.query('rollback');
+        throw err;
+      } finally {
+        client.release();
       }
 
-      target.count = Number(target.count || 0) + 1;
-      target.lastAt = nowIso();
-
-      if (!Array.isArray(store.logs)) store.logs = [];
-      store.logs.push({ name, district, at: target.lastAt });
-
-      writeStore(store);
       return sendJson(res, 200, {
         ok: true,
         message: `${name} (${district}) 1독이 추가되었습니다.`,
-        state: buildState(),
+        state: await buildState(),
       });
     } catch (e) {
       return sendJson(res, 400, { ok: false, message: e.message || '요청 오류' });
@@ -308,8 +338,24 @@ async function handleApi(req, res) {
       if (!validateSession(body.token)) {
         return sendJson(res, 401, { ok: false, message: '관리자 인증이 필요합니다.' });
       }
-      writeStore({ members: [], logs: [] });
-      return sendJson(res, 200, { ok: true, message: '전체 기록이 초기화되었습니다.', state: buildState() });
+
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        await client.query('truncate table read_logs, members restart identity;');
+        await client.query('commit');
+      } catch (err) {
+        await client.query('rollback');
+        throw err;
+      } finally {
+        client.release();
+      }
+
+      return sendJson(res, 200, {
+        ok: true,
+        message: '전체 기록이 초기화되었습니다.',
+        state: await buildState(),
+      });
     } catch (e) {
       return sendJson(res, 400, { ok: false, message: e.message || '요청 오류' });
     }
@@ -320,13 +366,18 @@ async function handleApi(req, res) {
 
 const server = http.createServer(async (req, res) => {
   cleanupSessions();
-  if (req.url.startsWith('/api/')) {
-    return handleApi(req, res);
-  }
+  if (req.url.startsWith('/api/')) return handleApi(req, res);
   return serveStatic(req, res);
 });
 
-ensureStore();
-server.listen(PORT, () => {
-  console.log(`Bible Hall server running at http://localhost:${PORT}`);
-});
+(async () => {
+  try {
+    await initDb();
+    server.listen(PORT, () => {
+      console.log(`Bible Hall server running at http://localhost:${PORT}`);
+    });
+  } catch (e) {
+    console.error('Failed to initialize database:', e.message);
+    process.exit(1);
+  }
+})();

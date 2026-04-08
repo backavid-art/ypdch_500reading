@@ -10,7 +10,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         ADMIN_PASSWORD: 'change-this-password',
-        DATA_DIR: './data'
+        DATABASE_URL: 'postgresql://postgres:password@db.xxx.supabase.co:5432/postgres',
+        APP_TZ: 'Asia/Seoul'
       }
     }
   ]
