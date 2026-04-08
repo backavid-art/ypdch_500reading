@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: bible-hall
+    runtime: node
+    plan: free
+    buildCommand: "npm install --omit=dev"
+    startCommand: "npm start"
+    healthCheckPath: "/api/health"
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: bible-hall-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,18 @@
+[Unit]
+Description=Bible Hall Node Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/Users/cheolu/bible-hall-server
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=ADMIN_PASSWORD=change-this-password
+ExecStart=/usr/bin/node /Users/cheolu/bible-hall-server/server.js
+Restart=always
+RestartSec=3
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

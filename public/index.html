@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>양평동교회 성경 500독 명예의 전당</title>
+  <style>
+    :root {
+      --bg-1: #f8f5ec;
+      --bg-2: #efe6d3;
+      --card: #fffdf7;
+      --ink: #2b2520;
+      --gold: #bb8a2c;
+      --gold-dark: #8f6414;
+      --line: #e3d8c2;
+      --ok: #256f3a;
+      --error: #a02f2f;
+      --shadow: 0 12px 30px rgba(82, 60, 22, 0.15);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 700px at 20% -10%, #fff8e4 0%, transparent 55%),
+        radial-gradient(1000px 600px at 95% 10%, #f6ecd6 0%, transparent 50%),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2));
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .container { max-width: 980px; margin: 0 auto; }
+
+    .hero {
+      background: linear-gradient(120deg, #fffdf6 0%, #f8efd8 100%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 28px 22px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 2.6vw, 2.5rem);
+      letter-spacing: -0.02em;
+      color: var(--gold-dark);
+    }
+    .subtitle { margin-top: 8px; font-size: 1rem; color: #5f5242; }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .thermo-wrap { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .thermo {
+      position: relative;
+      height: 26px;
+      background: #f2e8d2;
+      border: 1px solid #ddceb0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .thermo-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0%;
+      background: linear-gradient(90deg, #d09224 0%, #f2c15e 70%, #ffd98f 100%);
+      transition: width .35s ease;
+    }
+    .thermo-bulb {
+      width: 34px; height: 34px; border-radius: 50%; position: absolute; right: -10px; top: -4px;
+      background: radial-gradient(circle at 35% 30%, #ffe0a4 0%, #d89e38 68%, #be851e 100%);
+      border: 1px solid #bf8a31;
+    }
+    .ticks { display: grid; grid-template-columns: repeat(6, 1fr); font-size: 0.83rem; color: #7a6a55; }
+    .ticks span { text-align: center; }
+    .thermo-text { font-size: 0.95rem; font-weight: 700; color: #6a4e1e; }
+
+    .meta {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 0.92rem;
+      color: #66574a;
+    }
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: #fffbef;
+    }
+
+    .monthly-board { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .monthly-item {
+      border: 1px solid #e3d5bb;
+      background: linear-gradient(180deg, #fff8e7 0%, #fff2d8 100%);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 0.93rem;
+      color: #66470f;
+      font-weight: 700;
+    }
+    .monthly-empty { color: #7a6c5a; font-size: 0.95rem; padding: 3px 0; }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      min-width: 620px;
+    }
+    thead th {
+      background: #f8eed8;
+      color: #624a20;
+      text-align: left;
+      padding: 12px 10px;
+      font-size: 0.94rem;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 11px 10px;
+      border-bottom: 1px solid #efe7d8;
+      vertical-align: middle;
+      font-size: 0.96rem;
+    }
+    tbody tr:nth-child(even) { background: #fffcf6; }
+
+    .district-chip {
+      display: inline-block;
+      border: 1px solid #dfcfaf;
+      border-radius: 999px;
+      padding: 3px 9px;
+      background: #fff8e9;
+      color: #6b5121;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .count { font-weight: 800; color: var(--gold-dark); }
+
+    .chart { display: grid; gap: 10px; margin-top: 10px; }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 72px;
+      gap: 10px;
+      align-items: center;
+    }
+    .bar-label { font-size: 0.92rem; color: #5f5242; font-weight: 700; }
+    .bar-track {
+      height: 18px;
+      border-radius: 999px;
+      background: #f0e6d1;
+      border: 1px solid #e1d4bb;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #bb8a2c 0%, #dbab4d 100%);
+    }
+    .bar-value { font-size: 0.92rem; color: #6f5b39; text-align: right; font-weight: 700; }
+
+    .footer { font-size: 0.85rem; color: #7a6c5a; text-align: right; margin-top: 6px; }
+
+    .auth-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.7fr 0.7fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .admin-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr 0.7fr 0.7fr;
+      gap: 10px;
+    }
+
+    input, button, select {
+      width: 100%;
+      height: 44px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      font-size: 1rem;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--ink);
+    }
+    button {
+      border: none;
+      background: linear-gradient(180deg, #d39f37 0%, #b8831f 100%);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .12s ease, filter .2s ease;
+    }
+    button:hover { filter: brightness(1.03); }
+    button:active { transform: translateY(1px); }
+    button[disabled], input[disabled], select[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+    .message { margin-top: 8px; min-height: 22px; font-size: 0.95rem; font-weight: 600; }
+    .ok { color: var(--ok); }
+    .error { color: var(--error); }
+    .lock { color: #8a5a17; }
+
+    @media (max-width: 760px) {
+      .auth-grid, .admin-grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; gap: 6px; }
+      .bar-value { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>양평동교회 성경 500독 명예의 전당</h1>
+      <div class="subtitle">2026년 전교인 성경500독 대장정 (2026년 1월 ~ 2026년 12월까지)</div>
+    </section>
+
+    <section class="panel">
+      <h2 style="margin:0; font-size:1.05rem;">500독 달성 온도계</h2>
+      <div class="meta" style="margin-top:6px;">
+        <span class="tag">목표 500독</span>
+        <span class="tag" id="thermoSummary">0 / 500독</span>
+      </div>
+      <div class="thermo-wrap">
+        <div class="thermo">
+          <div id="thermoFill" class="thermo-fill"></div>
+          <div class="thermo-bulb"></div>
+        </div>
+        <div class="ticks">
+          <span>0</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500</span>
+        </div>
+        <div id="thermoText" class="thermo-text">현재 0독</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 style="margin:0; font-size:1.05rem;">이번달 업데이트</h2>
+      <div class="meta" style="margin-top:6px;">
+        <span class="tag" id="monthTag">이번 달</span>
+        <span class="tag">당월 자동 반영</span>
+      </div>
+      <div id="monthlyBoard" class="monthly-board"></div>
+    </section>
+
+    <section class="panel">
+      <h2 style="margin:0 0 10px; font-size:1.05rem;">명예의 전당</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>이름</th>
+              <th>교구</th>
+              <th>완독 횟수</th>
+              <th>최근 기록</th>
+            </tr>
+          </thead>
+          <tbody id="hallBody">
+            <tr>
+              <td colspan="5" style="text-align:center;color:#7a6c5a;padding:18px;">아직 기록이 없습니다. 첫 이름을 등록해 주세요.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="footer">저장 방식: 서버 저장(store.json)</div>
+    </section>
+
+    <section class="panel">
+      <h2 style="margin:0; font-size:1.05rem;">교구별 완독 횟수</h2>
+      <div id="districtChart" class="chart"></div>
+    </section>
+
+    <section class="panel">
+      <h2 style="margin:0 0 10px; font-size:1.05rem;">관리자 입력</h2>
+      <div class="auth-grid">
+        <input id="passwordInput" type="password" placeholder="관리자 비밀번호 입력" />
+        <button id="loginBtn">관리자 로그인</button>
+        <button id="logoutBtn" style="background:linear-gradient(180deg,#6a7682 0%, #4f5a66 100%);">로그아웃</button>
+      </div>
+      <div class="admin-grid">
+        <input id="nameInput" type="text" placeholder="이름 입력 (예: 홍길동)" />
+        <select id="districtInput">
+          <option value="당회원">당회원</option>
+          <option value="장년교구">장년교구</option>
+          <option value="중년교구">중년교구</option>
+          <option value="젊은이교구">젊은이교구</option>
+          <option value="청년교구">청년교구</option>
+          <option value="다음세대">다음세대</option>
+        </select>
+        <button id="addBtn">1독 추가</button>
+        <button id="resetBtn" style="background:linear-gradient(180deg,#7d6a4f 0%, #65533a 100%);">전체 초기화</button>
+      </div>
+      <div class="meta">
+        <span class="tag">총 참여자: <strong id="totalPeople">0</strong>명</span>
+        <span class="tag">누적 완독 횟수: <strong id="totalReads">0</strong>독</span>
+      </div>
+      <div id="message" class="message"></div>
+    </section>
+  </div>
+
+  <script>
+    const DISTRICTS = ["당회원", "장년교구", "중년교구", "젊은이교구", "청년교구", "다음세대"];
+
+    const passwordInput = document.getElementById("passwordInput");
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const nameInput = document.getElementById("nameInput");
+    const districtInput = document.getElementById("districtInput");
+    const addBtn = document.getElementById("addBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const hallBody = document.getElementById("hallBody");
+    const monthlyBoard = document.getElementById("monthlyBoard");
+    const districtChart = document.getElementById("districtChart");
+    const totalPeople = document.getElementById("totalPeople");
+    const totalReads = document.getElementById("totalReads");
+    const message = document.getElementById("message");
+    const monthTag = document.getElementById("monthTag");
+    const thermoFill = document.getElementById("thermoFill");
+    const thermoText = document.getElementById("thermoText");
+    const thermoSummary = document.getElementById("thermoSummary");
+
+    let adminToken = sessionStorage.getItem("admin_token") || "";
+    let currentState = null;
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function flash(text, type) {
+      message.textContent = text;
+      message.className = `message ${type}`;
+      clearTimeout(flash._t);
+      flash._t = setTimeout(() => {
+        message.textContent = "";
+        message.className = "message";
+      }, 2200);
+    }
+
+    function updateAdminLock() {
+      const isAdmin = Boolean(adminToken);
+      nameInput.disabled = !isAdmin;
+      districtInput.disabled = !isAdmin;
+      addBtn.disabled = !isAdmin;
+      resetBtn.disabled = !isAdmin;
+      passwordInput.disabled = isAdmin;
+      loginBtn.disabled = isAdmin;
+      logoutBtn.disabled = !isAdmin;
+      if (!isAdmin) nameInput.value = "";
+    }
+
+    async function api(path, method = "GET", body = null) {
+      const opts = { method, headers: {} };
+      if (body) {
+        opts.headers["Content-Type"] = "application/json";
+        opts.body = JSON.stringify(body);
+      }
+      const res = await fetch(path, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.message || "요청 실패");
+      }
+      return data;
+    }
+
+    function renderThermometer(total, goal) {
+      const safeGoal = Math.max(1, Number(goal || 500));
+      const ratio = Math.min(total / safeGoal, 1);
+      const percent = Math.round(ratio * 100);
+      thermoFill.style.width = `${percent}%`;
+      thermoText.textContent = total >= safeGoal
+        ? `현재 ${total}독 · 목표 ${safeGoal}독 달성`
+        : `현재 ${total}독 · ${safeGoal - total}독 남음`;
+      thermoSummary.textContent = `${total} / ${safeGoal}독`;
+    }
+
+    function renderMonthlyBoard(list) {
+      if (!Array.isArray(list) || !list.length) {
+        monthlyBoard.innerHTML = '<div class="monthly-empty">이번 달 업데이트된 인물이 없습니다.</div>';
+        return;
+      }
+      monthlyBoard.innerHTML = list
+        .map((x) => `<span class="monthly-item">${escapeHtml(x.name)} (${escapeHtml(x.district)}) · 이번 달 +${x.count}독</span>`)
+        .join("");
+    }
+
+    function renderDistrictChart(districtTotals) {
+      const labels = DISTRICTS.concat((districtTotals?.["미분류"] || 0) > 0 ? ["미분류"] : []);
+      const maxValue = Math.max(1, ...labels.map((d) => Number(districtTotals?.[d] || 0)));
+      districtChart.innerHTML = labels.map((d) => {
+        const value = Number(districtTotals?.[d] || 0);
+        const width = Math.round((value / maxValue) * 100);
+        return `
+          <div class="bar-row">
+            <div class="bar-label">${escapeHtml(d)}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${width}%;"></div></div>
+            <div class="bar-value">${value}독</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderHall(members) {
+      if (!Array.isArray(members) || !members.length) {
+        hallBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#7a6c5a;padding:18px;">아직 기록이 없습니다. 첫 이름을 등록해 주세요.</td></tr>';
+        return;
+      }
+      hallBody.innerHTML = members.map((m, i) => `
+        <tr>
+          <td>#${i + 1}</td>
+          <td><strong>${escapeHtml(m.name)}</strong></td>
+          <td><span class="district-chip">${escapeHtml(m.district)}</span></td>
+          <td><span class="count">${m.count}</span>독</td>
+          <td>${escapeHtml(m.lastAtText || "-")}</td>
+        </tr>
+      `).join("");
+    }
+
+    function render(state) {
+      currentState = state;
+      totalPeople.textContent = String(state.totalPeople || 0);
+      totalReads.textContent = String(state.totalReads || 0);
+      monthTag.textContent = state.currentMonthLabel || "이번 달";
+      renderThermometer(Number(state.totalReads || 0), Number(state.goalReads || 500));
+      renderMonthlyBoard(state.monthlyUpdates || []);
+      renderDistrictChart(state.districtTotals || {});
+      renderHall(state.members || []);
+    }
+
+    async function fetchState(silent = false) {
+      try {
+        const data = await api("/api/state");
+        render(data.state);
+      } catch (e) {
+        if (!silent) flash(e.message, "error");
+      }
+    }
+
+    async function login() {
+      const password = passwordInput.value;
+      if (!password) {
+        flash("비밀번호를 입력해 주세요.", "error");
+        passwordInput.focus();
+        return;
+      }
+      try {
+        const data = await api("/api/login", "POST", { password });
+        adminToken = data.token;
+        sessionStorage.setItem("admin_token", adminToken);
+        passwordInput.value = "";
+        updateAdminLock();
+        flash(data.message || "관리자 로그인 되었습니다.", "ok");
+        nameInput.focus();
+      } catch (e) {
+        flash(e.message, "error");
+      }
+    }
+
+    async function logout() {
+      try {
+        await api("/api/logout", "POST", { token: adminToken });
+      } catch (_) {}
+      adminToken = "";
+      sessionStorage.removeItem("admin_token");
+      updateAdminLock();
+      flash("로그아웃되었습니다. 수정 권한이 잠겼습니다.", "lock");
+      passwordInput.focus();
+    }
+
+    async function addOneRead() {
+      if (!adminToken) {
+        flash("관리자 로그인 후 수정할 수 있습니다.", "lock");
+        return;
+      }
+
+      const name = (nameInput.value || "").trim();
+      const district = districtInput.value;
+
+      if (!name) {
+        flash("이름을 입력해 주세요.", "error");
+        nameInput.focus();
+        return;
+      }
+      if (!DISTRICTS.includes(district)) {
+        flash("교구를 선택해 주세요.", "error");
+        districtInput.focus();
+        return;
+      }
+
+      try {
+        const data = await api("/api/reads", "POST", { token: adminToken, name, district });
+        render(data.state);
+        flash(data.message || "1독이 추가되었습니다.", "ok");
+        nameInput.value = "";
+        nameInput.focus();
+      } catch (e) {
+        if (e.message.includes("인증")) {
+          adminToken = "";
+          sessionStorage.removeItem("admin_token");
+          updateAdminLock();
+        }
+        flash(e.message, "error");
+      }
+    }
+
+    async function resetAll() {
+      if (!adminToken) {
+        flash("관리자 로그인 후 초기화할 수 있습니다.", "lock");
+        return;
+      }
+      if (!confirm("모든 기록을 초기화할까요?")) return;
+      try {
+        const data = await api("/api/reset", "POST", { token: adminToken });
+        render(data.state);
+        flash(data.message || "전체 기록이 초기화되었습니다.", "ok");
+      } catch (e) {
+        if (e.message.includes("인증")) {
+          adminToken = "";
+          sessionStorage.removeItem("admin_token");
+          updateAdminLock();
+        }
+        flash(e.message, "error");
+      }
+    }
+
+    loginBtn.addEventListener("click", login);
+    logoutBtn.addEventListener("click", logout);
+    addBtn.addEventListener("click", addOneRead);
+    resetBtn.addEventListener("click", resetAll);
+
+    passwordInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") login();
+    });
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addOneRead();
+    });
+
+    updateAdminLock();
+    fetchState();
+    setInterval(() => fetchState(true), 30000);
+  </script>
+</body>
+</html>
