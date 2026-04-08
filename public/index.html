@@ -111,6 +111,24 @@
       font-weight: 700;
     }
     .monthly-empty { color: #7a6c5a; font-size: 0.95rem; padding: 3px 0; }
+    .monthly-summary-line {
+      margin-top: 8px;
+      font-size: 0.95rem;
+      color: #6b5a3b;
+      font-weight: 700;
+    }
+    .monthly-details {
+      margin-top: 8px;
+      border-top: 1px dashed #dccdad;
+      padding-top: 8px;
+    }
+    .monthly-details > summary {
+      cursor: pointer;
+      color: #7a5d27;
+      font-size: 0.9rem;
+      font-weight: 700;
+      user-select: none;
+    }
 
     .table-wrap {
       overflow-x: auto;
@@ -287,7 +305,11 @@
         <span class="tag" id="monthTag">이번 달</span>
         <span class="tag">당월 자동 반영</span>
       </div>
-      <div id="monthlyBoard" class="monthly-board"></div>
+      <div id="monthlySummaryLine" class="monthly-summary-line">이번 달 업데이트된 인물이 없습니다.</div>
+      <details id="monthlyDetails" class="monthly-details">
+        <summary>전체 목록 펼쳐보기</summary>
+        <div id="monthlyBoard" class="monthly-board"></div>
+      </details>
     </section>
 
     <section class="panel">
@@ -379,6 +401,8 @@
     const backupBtn = document.getElementById("backupBtn");
     const hallBody = document.getElementById("hallBody");
     const monthlyBoard = document.getElementById("monthlyBoard");
+    const monthlySummaryLine = document.getElementById("monthlySummaryLine");
+    const monthlyDetails = document.getElementById("monthlyDetails");
     const districtChart = document.getElementById("districtChart");
     const totalPeople = document.getElementById("totalPeople");
     const totalReads = document.getElementById("totalReads");
@@ -458,9 +482,18 @@
 
     function renderMonthlyBoard(list) {
       if (!Array.isArray(list) || !list.length) {
+        monthlySummaryLine.textContent = "이번 달 업데이트된 인물이 없습니다.";
         monthlyBoard.innerHTML = '<div class="monthly-empty">이번 달 업데이트된 인물이 없습니다.</div>';
+        monthlyDetails.open = false;
+        monthlyDetails.style.display = "none";
         return;
       }
+
+      const totalAdds = list.reduce((sum, x) => sum + Number(x.count || 0), 0);
+      const top = list[0];
+      monthlySummaryLine.textContent = `이번 달 ${list.length}명 업데이트 · 총 +${totalAdds}독 · 최다 ${top.name}(${top.district}) +${top.count}독`;
+      monthlyDetails.style.display = "block";
+
       monthlyBoard.innerHTML = list
         .map((x) => `<span class="monthly-item">${escapeHtml(x.name)} (${escapeHtml(x.district)}) · 이번 달 +${x.count}독</span>`)
         .join("");
